@@ -25,3 +25,70 @@ de los kernels de los sistemas operativos, todo dentro de un entorno controlado 
       memoria y almacenamiento.
     - Implementar nuevas llamadas al sistema para la captura de instantáneas de la memoria, el monitoreo del uso de las
       llamadas al sistema y la recopilación de estadísticas de I/O.
+
+## **Configuración del Entorno**
+
+Para configurar y compilar el kernel modificado, se deben seguir los pasos detallados a continuación:
+
+1. **Instalación de herramientas esenciales:**
+   Se requiere instalar las dependencias necesarias para la compilación del kernel. En una terminal, ejecutar el
+   siguiente comando:
+
+   ```bash
+   sudo apt install build-essential libncurses-dev bison flex libssl-dev libelf-dev
+   ```
+
+2. **Copia de la configuración actual del sistema:**
+   Para preservar la funcionalidad del sistema actual, se debe copiar la configuración activa del kernel en uso. Esto se
+   logra con el siguiente comando:
+
+   ```bash
+   cp /boot/config-$(uname -r) .config
+   ```
+
+3. **Actualización de la configuración del kernel:**
+   Para integrar las nuevas opciones del kernel descargado, se utiliza el siguiente comando, el cual pedirá confirmar o
+   modificar configuraciones nuevas:
+
+   ```bash
+   make oldconfig
+   ```
+
+4. **Deshabilitación de claves del sistema:**
+   En caso de ser necesario, se pueden deshabilitar las claves de confianza del sistema con los comandos:
+
+   ```bash
+   scripts/config --disable SYSTEM_TRUSTED_KEYS
+   scripts/config --disable SYSTEM_REVOCATION_KEYS
+   ```
+
+5. **Compilación del kernel y sus módulos:**
+   Para compilar el kernel y los módulos asociados, se deben ejecutar los siguientes comandos en orden:
+
+    - Compilar el kernel:
+
+      ```bash
+      make -j$(nproc)
+      ```
+
+    - Instalar los módulos del kernel:
+
+      ```bash
+      make modules_install
+      ```
+
+    - Instalar los encabezados del kernel:
+
+      ```bash
+      make headers_install
+      ```
+
+    - Instalar el kernel:
+
+      ```bash
+      make install
+      ```
+
+6. **Reinicio del sistema:**
+   Una vez instalado el kernel, se debe reiniciar el sistema para aplicar los cambios. Al arrancar el sistema,
+   seleccionar el kernel personalizado desde el gestor de arranque.
