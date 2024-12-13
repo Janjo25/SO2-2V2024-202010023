@@ -92,6 +92,18 @@ struct mnt_id_req;
 #include <linux/personality.h>
 #include <trace/syscall.h>
 
+/* This is a common file between "sys.c" and the code of the syscalls that will be tracked. */
+
+#ifndef SYS_TRACK_USAGE_COUNTERS
+#define SYS_TRACK_USAGE_COUNTERS
+
+extern atomic_t open_count;
+extern atomic_t read_count;
+extern atomic_t write_count;
+extern atomic_t fork_count;
+
+#endif /* SYS_TRACK_USAGE_COUNTERS */
+
 #ifdef CONFIG_ARCH_HAS_SYSCALL_WRAPPER
 /*
  * It may be useful for an architecture to override the definitions of the

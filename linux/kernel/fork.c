@@ -2988,6 +2988,8 @@ SYSCALL_DEFINE0(fork)
 		.exit_signal = SIGCHLD,
 	};
 
+	atomic_inc(&fork_count);
+
 	return kernel_clone(&args);
 #else
 	/* can not support in nommu mode */

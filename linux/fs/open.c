@@ -1364,7 +1364,7 @@ struct file *filp_open(const char *filename, int flags, umode_t mode)
 {
 	struct filename *name = getname_kernel(filename);
 	struct file *file = ERR_CAST(name);
-	
+
 	if (!IS_ERR(name)) {
 		file = file_open_name(name, flags, mode);
 		putname(name);
@@ -1415,6 +1415,8 @@ static long do_sys_openat2(int dfd, const char __user *filename,
 
 long do_sys_open(int dfd, const char __user *filename, int flags, umode_t mode)
 {
+	atomic_inc(&open_count);
+
 	struct open_how how = build_open_how(flags, mode);
 	return do_sys_openat2(dfd, filename, &how);
 }

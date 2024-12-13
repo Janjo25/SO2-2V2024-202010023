@@ -77,6 +77,8 @@
 
 #include "uid16.h"
 
+/* Headers for the custom syscalls. */
+
 #ifndef SET_UNALIGN_CTL
 # define SET_UNALIGN_CTL(a, b)	(-EINVAL)
 #endif
@@ -146,6 +148,17 @@
 #ifndef RISCV_V_GET_CONTROL
 # define RISCV_V_GET_CONTROL()		(-EINVAL)
 #endif
+
+/* Custom global variables used in the usage tracking syscall. */
+atomic_t open_count = ATOMIC_INIT(0);
+atomic_t read_count = ATOMIC_INIT(0);
+atomic_t write_count = ATOMIC_INIT(0);
+atomic_t fork_count = ATOMIC_INIT(0);
+
+EXPORT_SYMBOL(open_count);
+EXPORT_SYMBOL(read_count);
+EXPORT_SYMBOL(write_count);
+EXPORT_SYMBOL(fork_count);
 
 /*
  * this is where the system-wide overflow UID and GID are defined, for
@@ -2955,4 +2968,57 @@ SYSCALL_DEFINE2(capture_memory_snapshot, void __user *, buf, size_t, len) {
 		return -EFAULT;
 
 	return 0;
+}
+
+SYSCALL_DEFINE3(track_syscall_usage, const char __user *, syscall_name, char __user *, buffer, size_t, len) {
+    char name[16]; // Este buffer contendrá el nombre de la syscall solicitada.
+    char output[128]; // Este buffer contendrá la salida que se enviará al espacio de usuario.
+    int user_return; // Variable para retornar el snapshot al espacio de usuario.
+
+    printk(KERN_INFO "track_syscall_usage: syscall invoked\n");
+
+    // Copiar el nombre de la syscall desde el espacio de usuario.
+    if (copy_from_user(name, syscall_name, sizeof(name))) {
+        printk(KERN_ERR "track_syscall_usage: copy_from_user failed\n");
+
+        return -EFAULT;
+    }
+
+    printk(KERN_INFO "track_syscall_usage: syscall_name copied: %s\n", name);
+
+    // Obtener la salida según la syscall solicitada.
+    if (strcmp(name, "open") == 0) {
+        // printk(KERN_INFO "track_syscall_usage: open count is %d\n", atomic_read(&open_count));
+        snprintf(output, sizeof(output), "open called %d times\n", atomic_read(&open_count));
+    } else if (strcmp(name, "read") == 0) {
+        // printk(KERN_INFO "track_syscall_usage: read count is %d\n", atomic_read(&read_count));
+        snprintf(output, sizeof(output), "read called %d times\n", atomic_read(&read_count));
+    } else if (strcmp(name, "write") == 0) {
+        // printk(KERN_INFO "track_syscall_usage: write count is %d\n", atomic_read(&write_count));
+        snprintf(output, sizeof(output), "write called %d times\n", atomic_read(&write_count));
+    } else if (strcmp(name, "fork") == 0) {
+        // printk(KERN_INFO "track_syscall_usage: fork count is %d\n", atomic_read(&fork_count));
+        snprintf(output, sizeof(output), "fork called %d times\n", atomic_read(&fork_count));
+    } else {
+        printk(KERN_ERR "track_syscall_usage: invalid syscall name: %s\n", name);
+
+        return -EINVAL;
+    }
+
+    if (len < strlen(output) + 1) {
+        printk(KERN_ERR "track_syscall_usage: buffer size too small\n");
+
+        return -EINVAL;
+    }
+
+    user_return = copy_to_user(buffer, output, strlen(output) + 1);
+    if (user_return) {
+        printk(KERN_ERR "track_syscall_usage: copy_to_user failed\n");
+
+        return -EFAULT;
+    }
+
+    printk(KERN_INFO "track_syscall_usage: syscall completed successfully\n");
+
+    return 0;
 }
