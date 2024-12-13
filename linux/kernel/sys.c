@@ -2922,3 +2922,37 @@ COMPAT_SYSCALL_DEFINE1(sysinfo, struct compat_sysinfo __user *, info)
 	return 0;
 }
 #endif /* CONFIG_COMPAT */
+
+SYSCALL_DEFINE2(capture_memory_snapshot, void __user *, buf, size_t, len) {
+	struct sysinfo memory_information;
+	char snapshot[256]; // En este buffer se almacenará el snapshot que se enviará al espacio de usuario.
+	int user_return; // Variable para retornar el snapshot al espacio de usuario.
+
+	si_meminfo(&memory_information);
+
+	// Formato del snapshot.
+	snprintf(
+		snapshot, sizeof(snapshot),
+		"Memoria Total: %lu kB\n"
+		"Memory Libre: %lu kB\n"
+		"Buffers: %lu kB\n"
+		"Memoria Cacheada: %lu kB\n"
+		"Swap Total: %lu kB\n"
+		"Swap Libre: %lu kB\n",
+		memory_information.totalram << (PAGE_SHIFT - 10),
+		memory_information.freeram << (PAGE_SHIFT - 10),
+		memory_information.bufferram << (PAGE_SHIFT - 10),
+		global_node_page_state(NR_FILE_PAGES) << (PAGE_SHIFT - 10),
+		memory_information.totalswap << (PAGE_SHIFT - 10),
+		memory_information.freeswap << (PAGE_SHIFT - 10)
+	);
+
+	if (len < strlen(snapshot) + 1)
+		return -EINVAL;
+
+	user_return = copy_to_user(buf, snapshot, strlen(snapshot) + 1);
+	if (user_return)
+		return -EFAULT;
+
+	return 0;
+}
