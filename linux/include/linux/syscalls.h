@@ -1177,6 +1177,15 @@ asmlinkage long sys_mmap_pgoff(unsigned long addr, unsigned long len,
 			unsigned long fd, unsigned long pgoff);
 asmlinkage long sys_old_mmap(struct mmap_arg_struct __user *arg);
 
+/* Prototype for the syscall to capture a memory snapshot. */
+asmlinkage long sys_capture_memory_snapshot(void __user *buf, size_t len);
+
+/* Prototype for the syscall to track the usage of the open, write, read and fork syscalls. */
+asmlinkage long sys_track_syscall_usage(const char __user *syscall_name, char __user *buffer, size_t len);
+
+/* Prototype for the syscall to get the I/O throttle value. */
+asmlinkage long sys_get_io_throttle(pid_t pid, char __user *buffer, size_t len);
+
 
 /*
  * Not a real system call, but a placeholder for syscalls which are
