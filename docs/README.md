@@ -92,3 +92,46 @@ Para configurar y compilar el kernel modificado, se deben seguir los pasos detal
 6. **Reinicio del sistema:**
    Una vez instalado el kernel, se debe reiniciar el sistema para aplicar los cambios. Al arrancar el sistema,
    seleccionar el kernel personalizado desde el gestor de arranque.
+
+## **Descripción de Modificaciones en el Kernel**
+
+1. **Personalización del Nombre del Sistema**
+   Para modificar el nombre del sistema, es necesario editar el archivo `uts.h`, ubicado en la ruta `/include/linux/`.
+   En este archivo, se encuentra la línea correspondiente al nombre del sistema definido como `UTS_SYSNAME`.
+
+   La modificación consiste en cambiar el valor de esta línea por el nombre personalizado deseado. Por ejemplo:
+
+    ```c
+    #define UTS_SYSNAME "CustomKernel"
+    ```
+
+   Después de realizar esta modificación, se debe recompilar el kernel. Una vez compilado e instalado, la
+   personalización se puede verificar utilizando los comandos:
+
+    ```bash
+    uname -a
+    uname -r
+    ```
+
+2. **Adición de un Mensaje de Bienvenida**
+   Para agregar un mensaje de bienvenida al kernel, se debe modificar el archivo `main.c`, ubicado en la ruta `/init/`.
+   En este archivo, buscar la función `start_kernel`, que se encarga de las inicializaciones al iniciar el kernel.
+
+   Dentro de la función `start_kernel`, localizar la línea que contiene:
+
+    ```c
+    pr_notice("%s", linux_banner);
+    ```
+
+   Debajo de esta línea, agregar el siguiente código para incluir el mensaje de bienvenida:
+
+    ```c
+    printk(KERN_INFO "¡Bienvenido al kernel USAC! 😎\n");
+    ```
+
+   Después de realizar esta modificación, se debe recompilar el kernel. El mensaje agregado será visible durante el
+   arranque del sistema o al consultar el registro de mensajes con el comando:
+
+    ```bash
+    dmesg | grep "¡Bienvenido al kernel USAC"
+    ```
