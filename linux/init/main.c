@@ -893,6 +893,10 @@ void start_kernel(void)
 	boot_cpu_init();
 	page_address_init();
 	pr_notice("%s", linux_banner);
+
+	/* Custom welcome message displayed at boot time. */
+	printk(KERN_INFO "¡Bienvenido al kernel USAC! 😎\n");
+
 	early_security_init();
 	setup_arch(&command_line);
 	setup_boot_config();
