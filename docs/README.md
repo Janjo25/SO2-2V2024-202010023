@@ -135,3 +135,124 @@ Para configurar y compilar el kernel modificado, se deben seguir los pasos detal
     ```bash
     dmesg | grep "¡Bienvenido al kernel USAC"
     ```
+
+## **Documentación de la llamada al sistema `capture_memory_snapshot`**
+
+### **Propósito**
+
+La llamada al sistema `capture_memory_snapshot` permite capturar el estado de la memoria del sistema en un instante
+determinado. Esto incluye información como memoria total, memoria libre, buffers, caché, swap total, y swap libre. Es
+útil para analizar el uso de memoria, identificar posibles problemas de fragmentación y realizar un monitoreo detallado
+del sistema.
+
+### **Diseño**
+
+#### **Definición**
+
+```c
+SYSCALL_DEFINE2(capture_memory_snapshot, void __user *, buf, size_t, len);
+```
+
+#### **Parámetros**
+
+1. **`buf`**:
+   Puntero al espacio de usuario donde se almacenará el snapshot de memoria. Este buffer debe ser lo suficientemente
+   grande para contener la información generada.
+
+2. **`len`**:
+   Tamaño del buffer proporcionado, en bytes. Se utiliza para validar que el buffer sea suficiente para la operación.
+
+#### **Valor de Retorno**
+
+- **`0`**: Indica que la operación se realizó con éxito.
+- **`-EINVAL`**: Se retorna si el buffer proporcionado es demasiado pequeño.
+- **`-EFAULT`**: Indica que hubo un fallo al copiar los datos al espacio de usuario.
+
+### **Código Implementado**
+
+```c
+SYSCALL_DEFINE2(capture_memory_snapshot, void __user *, buf, size_t, len) {
+	struct sysinfo memory_information;
+	char snapshot[256]; // En este buffer se almacenará el snapshot que se enviará al espacio de usuario.
+	int user_return; // Variable para retornar el snapshot al espacio de usuario.
+
+	si_meminfo(&memory_information);
+
+	// Formato del snapshot.
+	snprintf(
+		snapshot, sizeof(snapshot),
+		"Memoria Total: %lu kB\n"
+		"Memory Libre: %lu kB\n"
+		"Buffers: %lu kB\n"
+		"Memoria Cacheada: %lu kB\n"
+		"Swap Total: %lu kB\n"
+		"Swap Libre: %lu kB\n",
+		memory_information.totalram << (PAGE_SHIFT - 10),
+		memory_information.freeram << (PAGE_SHIFT - 10),
+		memory_information.bufferram << (PAGE_SHIFT - 10),
+		global_node_page_state(NR_FILE_PAGES) << (PAGE_SHIFT - 10),
+		memory_information.totalswap << (PAGE_SHIFT - 10),
+		memory_information.freeswap << (PAGE_SHIFT - 10)
+	);
+
+	if (len < strlen(snapshot) + 1)
+		return -EINVAL;
+
+	user_return = copy_to_user(buf, snapshot, strlen(snapshot) + 1);
+	if (user_return)
+		return -EFAULT;
+
+	return 0;
+}
+```
+
+### **Ejemplo de Uso**
+
+El siguiente ejemplo muestra cómo realizar una llamada a `capture_memory_snapshot` desde un programa de espacio de
+usuario.
+
+#### Código del Usuario
+
+```c
+#include <errno.h>
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+
+#define SYSCALL_NUM 462
+
+int main() {
+    char buffer[512] = {0};
+
+    const long user_return = syscall(SYSCALL_NUM, buffer, sizeof(buffer));
+
+    if (user_return == 0) {
+        printf("Snapshot de memoria:\n%s\n", buffer);
+    } else {
+        printf("Error al ejecutar la syscall: %s\n", strerror(errno));
+    }
+
+    return 0;
+}
+```
+
+#### Compilación y Ejecución
+
+Para compilar y ejecutar el programa:
+
+```bash
+gcc -o capture_memory_snapshot capture_memory_snapshot.c
+./capture_memory_snapshot
+```
+
+#### Salida Esperada
+
+```plaintext
+Snapshot de memoria:
+Memoria Total: 8138788 kB
+Memory Libre: 354680 kB
+Buffers: 106320 kB
+Memoria Cacheada: 1449960 kB
+Swap Total: 0 kB
+Swap Libre: 0 kB
+```
