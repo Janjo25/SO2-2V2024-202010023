@@ -383,6 +383,9 @@
 459	common	lsm_get_self_attr	sys_lsm_get_self_attr
 460	common	lsm_set_self_attr	sys_lsm_set_self_attr
 461	common	lsm_list_modules	sys_lsm_list_modules
+462	common	capture_memory_snapshot	sys_capture_memory_snapshot
+463	common	track_syscall_usage	sys_track_syscall_usage
+464	common	get_io_throttle	sys_get_io_throttle
 
 #
 # Due to a historical design error, certain syscalls are numbered differently
