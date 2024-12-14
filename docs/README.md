@@ -444,3 +444,30 @@ Estadísticas de uso de llamadas al sistema: read called 187596 times
 Estadísticas de uso de llamadas al sistema: write called 71373 times
 Estadísticas de uso de llamadas al sistema: fork called 8 times
 ```
+
+## **Pruebas realizadas**
+
+Se realizaron diversas pruebas para verificar el correcto funcionamiento de las syscalls y módulos implementados en el
+kernel. Las pruebas se enfocaron en los siguientes aspectos:
+
+1. **Compilación y carga del kernel**:
+    - Cada modificación al kernel fue compilada exitosamente, asegurando que no hubiera errores de sintaxis ni
+      conflictos durante la construcción.
+    - El sistema se reinició con el nuevo kernel para verificar que las modificaciones no causaran problemas en el
+      arranque ni afectaran otras funciones del sistema operativo.
+
+2. **Pruebas con los módulos del kernel**:
+    - Se desarrollaron módulos del kernel complementarios que interactúan con las syscalls. Estos módulos fueron
+      cargados y descargados dinámicamente usando `insmod` y `rmmod`, sin errores ni bloqueos.
+    - Se utilizó `/proc` o `dmesg` para validar la salida generada por los módulos, asegurándose de que reflejara
+      correctamente la información proporcionada por las syscalls.
+
+3. **Problemas encontrados y ajustes realizados**:
+    - En algunos casos, se detectaron problemas iniciales relacionados con el acceso al espacio de usuario desde el
+      kernel. Estos problemas se resolvieron utilizando técnicas como `copy_to_user`.
+    - Algunos errores en las dependencias de bibliotecas del kernel fueron corregidos incluyendo encabezados adecuados y
+      asegurando que las estructuras necesarias estuvieran correctamente declaradas.
+
+4. **Resultados finales**:
+    - Todas las pruebas realizadas confirmaron que las syscalls y módulos funcionaban correctamente, entregando los
+      resultados esperados y manejando errores de manera robusta.
