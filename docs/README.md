@@ -445,6 +445,157 @@ Estadísticas de uso de llamadas al sistema: write called 71373 times
 Estadísticas de uso de llamadas al sistema: fork called 8 times
 ```
 
+## **Documentación de la llamada al sistema `get_io_throttle`**
+
+### **Propósito**
+
+El módulo `get_io_throttle` permite a los usuarios obtener información estadística sobre el uso de I/O de un proceso
+específico en el sistema, identificado por su PID. Este módulo facilita el análisis del comportamiento de entrada/salida
+de aplicaciones, mostrando detalles clave como la cantidad de bytes leídos y escritos, número de llamadas de lectura y
+escritura realizadas, bytes leídos desde disco, bytes escritos a disco, y bytes de escritura cancelados.
+
+### **Diseño**
+
+#### **Definición**
+
+```c
+SYSCALL_DEFINE2(get_io_throttle, pid_t, pid, struct io_stats __user *, stats);
+```
+
+#### **Parámetros**
+- 
+- `pid`: Identificador del proceso para el cual se desean las estadísticas.
+- `stats`: Estructura definida en el espacio de usuario donde se almacenará la información recopilada.
+
+#### **Valor de Retorno**
+- 
+- **0**: Indica que la operación se realizó con éxito.
+- **-ESRCH**: El PID proporcionado no corresponde a ningún proceso en ejecución.
+- **-EFAULT**: Ocurrió un error al copiar los datos al espacio de usuario.
+
+### **Código Implementado**
+
+```c
+struct io_stats {
+	u64 rchar;
+	u64 wchar;
+	u64 syscr;
+	u64 syscw;
+	u64 read_bytes;
+	u64 write_bytes;
+	u64 cancelled_write_bytes;
+};
+
+SYSCALL_DEFINE2(get_io_throttle, pid_t, pid, struct io_stats __user *, stats) {
+	struct task_struct *task;
+	struct io_stats kernel_stats;
+
+	rcu_read_lock(); // Protege contra cambios concurrentes mientras se busca la tarea.
+	task = pid_task(find_vpid(pid), PIDTYPE_PID); // Encuentra la tarea asociada al PID.
+	rcu_read_unlock();
+
+	// Si no se encuentra la tarea, retorna un error notificando que no existe la tarea.
+	if (!task)
+		return -ESRCH;
+
+	// Se verifica si el usuario tiene permisos suficientes para acceder al proceso objetivo.
+	if (!ptrace_may_access(task, PTRACE_MODE_READ_REALCREDS))
+		return -EACCES;
+
+	// Llena la estructura con estadísticas de I/O que será retornada al usuario.
+	kernel_stats.rchar = task->ioac.rchar;
+	kernel_stats.wchar = task->ioac.wchar;
+	kernel_stats.syscr = task->ioac.syscr;
+	kernel_stats.syscw = task->ioac.syscw;
+	kernel_stats.read_bytes = task->ioac.read_bytes;
+	kernel_stats.write_bytes = task->ioac.write_bytes;
+	kernel_stats.cancelled_write_bytes = task->ioac.cancelled_write_bytes;
+
+	if (copy_to_user(stats, &kernel_stats, sizeof(kernel_stats)))
+		return -EFAULT;
+
+	return 0;
+}
+```
+
+### **Ejemplo de Uso**
+
+El siguiente ejemplo muestra cómo realizar una llamada a `get_io_throttle` desde un programa de espacio de usuario.
+
+#### Código del Usuario
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+
+struct io_stats {
+    unsigned long long rchar;
+    unsigned long long wchar;
+    unsigned long long syscr;
+    unsigned long long syscw;
+    unsigned long long read_bytes;
+    unsigned long long write_bytes;
+    unsigned long long cancelled_write_bytes;
+};
+
+#define SYSCALL_NUM 464
+
+/*
+ * Con "argc" se cuenta la cantidad de argumentos pasados al programa. El primer argumento es el nombre del programa.
+ * Con "argv" se almacenan los argumentos pasados al programa en forma de arreglo de cadenas.
+ */
+int main(const int argc, char *argv[]) {
+    struct io_stats stats;
+
+    // Si no se pasó un PID como argumento, se explica cómo usar el programa.
+    if (argc != 2) {
+        fprintf(stderr, "Uso: %s <PID>\n", argv[0]);
+
+        return 1;
+    }
+
+    const pid_t pid = atoi(argv[1]); // NOLINT(*-err34-c)
+
+    if (syscall(SYSCALL_NUM, pid, &stats) == 0) {
+        printf("Estadísticas de I/O para el PID %d:\n", pid);
+        printf("  Bytes leídos: %llu\n", stats.rchar);
+        printf("  Bytes escritos: %llu\n", stats.wchar);
+        printf("  Llamadas a read: %llu\n", stats.syscr);
+        printf("  Llamadas a write: %llu\n", stats.syscw);
+        printf("  Bytes leídos del disco: %llu\n", stats.read_bytes);
+        printf("  Bytes escritos al disco: %llu\n", stats.write_bytes);
+        printf("  Bytes de escrituras canceladas: %llu\n", stats.cancelled_write_bytes);
+    } else {
+        perror("fallo en la llamada al sistema");
+    }
+
+    return 0;
+}
+```
+
+#### Compilación y Ejecución
+
+Compilar el programa con:
+
+```bash
+gcc -o get_io_throttle get_io_throttle.c
+./get_io_throttle <pid>
+```
+
+#### Salida Esperada
+
+```plaintext
+Estadísticas de I/O para el PID 2407:
+  Bytes leídos: 160646
+  Bytes escritos: 5030
+  Llamadas a read: 374
+  Llamadas a write: 225
+  Bytes leídos del disco: 57344
+  Bytes escritos al disco: 0
+  Bytes de escrituras canceladas: 0
+```
+
 ## **Pruebas realizadas**
 
 Se realizaron diversas pruebas para verificar el correcto funcionamiento de las syscalls y módulos implementados en el
