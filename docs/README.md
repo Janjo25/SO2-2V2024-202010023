@@ -256,3 +256,191 @@ Memoria Cacheada: 1449960 kB
 Swap Total: 0 kB
 Swap Libre: 0 kB
 ```
+
+## **Documentación de la llamada al sistema `track_syscall_usage`**
+
+### **Propósito**
+
+La llamada al sistema `track_syscall_usage` permite obtener información sobre el uso de ciertas llamadas al sistema
+específicas, como `open`, `read`, `write` y `fork`. Esta información incluye cuántas veces se han ejecutado estas
+syscalls desde que se inició el sistema. Es útil para auditorías, monitoreo del sistema y análisis de rendimiento.
+
+### **Diseño**
+
+#### **Definición**
+
+```c
+SYSCALL_DEFINE3(track_syscall_usage, const char __user *, syscall_name, char __user *, buffer, size_t, len);
+```
+
+#### **Parámetros**
+
+1. **`syscall_name`**:
+   Nombre de la syscall que se desea consultar (`"open"`, `"read"`, `"write"`, `"fork"`). Este parámetro se pasa desde
+   el espacio de usuario.
+2. **`buffer`**:
+   Puntero al espacio de usuario donde se almacenará el resultado.
+3. **`len`**:
+   Tamaño del buffer proporcionado, en bytes. Esto asegura que el buffer sea lo suficientemente grande para almacenar
+   los datos generados.
+
+#### **Valor de Retorno**
+
+- **`0`**: Indica que la operación se realizó con éxito.
+- **`-EINVAL`**: Se retorna si se proporcionó un nombre de syscall no válido o si el tamaño del buffer es insuficiente.
+- **`-EFAULT`**: Indica que hubo un fallo al copiar los datos al espacio de usuario.
+
+### **Código Implementado**
+
+```c
+/* Custom global variables used in the usage tracking syscall. */
+atomic_t open_count = ATOMIC_INIT(0);
+atomic_t read_count = ATOMIC_INIT(0);
+atomic_t write_count = ATOMIC_INIT(0);
+atomic_t fork_count = ATOMIC_INIT(0);
+
+EXPORT_SYMBOL(open_count);
+EXPORT_SYMBOL(read_count);
+EXPORT_SYMBOL(write_count);
+EXPORT_SYMBOL(fork_count);
+
+SYSCALL_DEFINE3(track_syscall_usage, const char __user *, syscall_name, char __user *, buffer, size_t, len) {
+    char name[16]; // Este buffer contendrá el nombre de la syscall solicitada.
+    char output[128]; // Este buffer contendrá la salida que se enviará al espacio de usuario.
+    int user_return; // Variable para retornar el snapshot al espacio de usuario.
+
+    printk(KERN_INFO "track_syscall_usage: syscall invoked\n");
+
+    // Copiar el nombre de la syscall desde el espacio de usuario.
+    if (copy_from_user(name, syscall_name, sizeof(name))) {
+        printk(KERN_ERR "track_syscall_usage: copy_from_user failed\n");
+
+        return -EFAULT;
+    }
+
+    printk(KERN_INFO "track_syscall_usage: syscall_name copied: %s\n", name);
+
+    // Obtener la salida según la syscall solicitada.
+    if (strcmp(name, "open") == 0) {
+        // printk(KERN_INFO "track_syscall_usage: open count is %d\n", atomic_read(&open_count));
+        snprintf(output, sizeof(output), "open called %d times\n", atomic_read(&open_count));
+    } else if (strcmp(name, "read") == 0) {
+        // printk(KERN_INFO "track_syscall_usage: read count is %d\n", atomic_read(&read_count));
+        snprintf(output, sizeof(output), "read called %d times\n", atomic_read(&read_count));
+    } else if (strcmp(name, "write") == 0) {
+        // printk(KERN_INFO "track_syscall_usage: write count is %d\n", atomic_read(&write_count));
+        snprintf(output, sizeof(output), "write called %d times\n", atomic_read(&write_count));
+    } else if (strcmp(name, "fork") == 0) {
+        // printk(KERN_INFO "track_syscall_usage: fork count is %d\n", atomic_read(&fork_count));
+        snprintf(output, sizeof(output), "fork called %d times\n", atomic_read(&fork_count));
+    } else {
+        printk(KERN_ERR "track_syscall_usage: invalid syscall name: %s\n", name);
+
+        return -EINVAL;
+    }
+
+    if (len < strlen(output) + 1) {
+        printk(KERN_ERR "track_syscall_usage: buffer size too small\n");
+
+        return -EINVAL;
+    }
+
+    user_return = copy_to_user(buffer, output, strlen(output) + 1);
+    if (user_return) {
+        printk(KERN_ERR "track_syscall_usage: copy_to_user failed\n");
+
+        return -EFAULT;
+    }
+
+    printk(KERN_INFO "track_syscall_usage: syscall completed successfully\n");
+
+    return 0;
+}
+```
+
+### **Ejemplo de Uso**
+
+El siguiente ejemplo muestra cómo utilizar la syscall `track_syscall_usage` desde un programa de espacio de usuario.
+
+#### Código del Usuario
+
+```c
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+
+#define SYSCALL_NUM 463
+
+int main() {
+    char syscall_name[16];
+    char buffer[128];
+
+    // Solicitar contador para "open".
+    strncpy(syscall_name, "open", sizeof(syscall_name));
+
+    int user_return = syscall(SYSCALL_NUM, syscall_name, buffer, sizeof(buffer));
+    if (user_return < 0) {
+        perror("fallo en la llamada al sistema (open)");
+
+        return 1;
+    }
+
+    printf("Estadísticas de uso de llamadas al sistema: %s\n", buffer);
+
+    // Solicitar contador para "read".
+    strncpy(syscall_name, "read", sizeof(syscall_name));
+
+    user_return = syscall(SYSCALL_NUM, syscall_name, buffer, sizeof(buffer));
+    if (user_return < 0) {
+        perror("fallo en la llamada al sistema (read)");
+
+        return 1;
+    }
+
+    printf("Estadísticas de uso de llamadas al sistema: %s\n", buffer);
+
+    // Solicitar contador para "write".
+    strncpy(syscall_name, "write", sizeof(syscall_name));
+
+    user_return = syscall(SYSCALL_NUM, syscall_name, buffer, sizeof(buffer));
+    if (user_return < 0) {
+        perror("fallo en la llamada al sistema (write)");
+
+        return 1;
+    }
+
+    printf("Estadísticas de uso de llamadas al sistema: %s\n", buffer);
+
+    // Solicitar contador para "fork".
+    strncpy(syscall_name, "fork", sizeof(syscall_name));
+
+    user_return = syscall(SYSCALL_NUM, syscall_name, buffer, sizeof(buffer));
+    if (user_return < 0) {
+        perror("fallo en la llamada al sistema (fork)");
+
+        return 1;
+    }
+
+    printf("Contadores de uso de llamadas al sistema: %s\n", buffer);
+
+    return 0;
+}
+```
+
+#### Compilación y Ejecución
+
+Para compilar y ejecutar el programa:
+
+```bash
+gcc -o track_syscall_usage track_syscall_usage.c
+./track_syscall_usage
+```
+
+#### Salida Esperada
+
+```plaintext
+Estadísticas de uso de llamadas al sistema: open called 258795 times
+Estadísticas de uso de llamadas al sistema: read called 187596 times
+Estadísticas de uso de llamadas al sistema: write called 71373 times
+Estadísticas de uso de llamadas al sistema: fork called 8 times
+```
