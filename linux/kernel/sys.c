@@ -77,8 +77,6 @@
 
 #include "uid16.h"
 
-/* Headers for the custom syscalls. */
-
 #ifndef SET_UNALIGN_CTL
 # define SET_UNALIGN_CTL(a, b)	(-EINVAL)
 #endif
@@ -3021,4 +3019,45 @@ SYSCALL_DEFINE3(track_syscall_usage, const char __user *, syscall_name, char __u
     printk(KERN_INFO "track_syscall_usage: syscall completed successfully\n");
 
     return 0;
+}
+
+struct io_stats {
+	u64 rchar;
+	u64 wchar;
+	u64 syscr;
+	u64 syscw;
+	u64 read_bytes;
+	u64 write_bytes;
+	u64 cancelled_write_bytes;
+};
+
+SYSCALL_DEFINE2(get_io_throttle, pid_t, pid, struct io_stats __user *, stats) {
+	struct task_struct *task;
+	struct io_stats kernel_stats;
+
+	rcu_read_lock(); // Protege contra cambios concurrentes mientras se busca la tarea.
+	task = pid_task(find_vpid(pid), PIDTYPE_PID); // Encuentra la tarea asociada al PID.
+	rcu_read_unlock();
+
+	// Si no se encuentra la tarea, retorna un error notificando que no existe la tarea.
+	if (!task)
+		return -ESRCH;
+
+	// Se verifica si el usuario tiene permisos suficientes para acceder al proceso objetivo.
+	if (!ptrace_may_access(task, PTRACE_MODE_READ_REALCREDS))
+		return -EACCES;
+
+	// Llena la estructura con estadísticas de I/O que será retornada al usuario.
+	kernel_stats.rchar = task->ioac.rchar;
+	kernel_stats.wchar = task->ioac.wchar;
+	kernel_stats.syscr = task->ioac.syscr;
+	kernel_stats.syscw = task->ioac.syscw;
+	kernel_stats.read_bytes = task->ioac.read_bytes;
+	kernel_stats.write_bytes = task->ioac.write_bytes;
+	kernel_stats.cancelled_write_bytes = task->ioac.cancelled_write_bytes;
+
+	if (copy_to_user(stats, &kernel_stats, sizeof(kernel_stats)))
+		return -EFAULT;
+
+	return 0;
 }

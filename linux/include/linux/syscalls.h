@@ -1196,7 +1196,7 @@ asmlinkage long sys_capture_memory_snapshot(void __user *buf, size_t len);
 asmlinkage long sys_track_syscall_usage(const char __user *syscall_name, char __user *buffer, size_t len);
 
 /* Prototype for the syscall to get the I/O throttle value. */
-asmlinkage long sys_get_io_throttle(pid_t pid, char __user *buffer, size_t len);
+asmlinkage long sys_get_io_throttle(pid_t pid, struct io_stats __user *stats);
 
 
 /*
