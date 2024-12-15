@@ -783,7 +783,7 @@ module_exit(system_stats_exit);
    sudo rmmod system_stats
    ```
 
-## **Pruebas realizadas**
+## **Pruebas Realizadas**
 
 Se realizaron diversas pruebas para verificar el correcto funcionamiento de las syscalls y módulos implementados en el
 kernel. Las pruebas se enfocaron en los siguientes aspectos:
@@ -809,3 +809,46 @@ kernel. Las pruebas se enfocaron en los siguientes aspectos:
 4. **Resultados finales**:
     - Todas las pruebas realizadas confirmaron que las syscalls y módulos funcionaban correctamente, entregando los
       resultados esperados y manejando errores de manera robusta.
+
+## **Desarrollo de Habilidades Blandas**
+
+### **Autogestión del Tiempo**
+
+Dado que el tiempo asignado para completar este proyecto fue de menos de una semana, tuve que organizar cuidadosamente
+mis actividades para asegurar la finalización exitosa. Aquí está el cronograma que seguí durante los días del proyecto:
+
+#### **Lunes: Exploración Inicial y Planificación**
+
+El primer día me enfoqué en entender la lógica detrás de las modificaciones del kernel. Revisé documentación, ejemplos
+previos y definí las prioridades. También establecí un plan general que incluyó etapas de desarrollo, pruebas y ajustes
+finales.
+
+#### **Martes: Configuración del Entorno de Trabajo**
+
+Dediqué este día a configurar el entorno de desarrollo necesario para el kernel. Realicé la instalación del kernel,
+ajustes en las herramientas necesarias y validé que todo estuviera funcional. Este proceso incluyó compilar el kernel
+base para asegurarme de que el entorno estuviera estable.
+
+#### **Miércoles: Desarrollo de las Syscalls**
+
+Comencé a trabajar en las llamadas al sistema. La primera fue `capture_memory_snapshot`, que requería entender el manejo
+de memoria del kernel y trabajar con las estructuras internas. También validé esta syscall con pruebas simples para
+asegurar su funcionalidad.
+
+#### **Jueves: Continuación y Pruebas**
+
+El jueves avancé con la implementación de `track_syscall_usage` y realicé pruebas extensas para verificar que los
+contadores de llamadas funcionaran correctamente. Aquí encontré varios errores que fueron solucionados revisando las
+dependencias y ajustando la lógica.
+
+#### **Viernes: Syscall de I/O**
+
+El viernes trabajé en la syscall `get_io_throttle`, que presentó retos significativos al usar estructuras como
+`task_io_accounting`. Esto me llevó a profundizar en cómo Linux gestiona estadísticas de entrada/salida por proceso.
+Validé los datos obtenidos para asegurar que fueran precisos y útiles.
+
+#### **Sábado: Ajustes Finales y Documentación**
+
+Este día fue dedicado a integrar todos los cambios, realizar pruebas completas de todas las syscalls y resolver
+cualquier inconsistencia restante. También comencé la redacción de la documentación para describir el diseño,
+implementación y pruebas realizadas.
