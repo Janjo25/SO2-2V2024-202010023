@@ -463,13 +463,11 @@ SYSCALL_DEFINE2(get_io_throttle, pid_t, pid, struct io_stats __user *, stats);
 ```
 
 #### **Parámetros**
-- 
 
 - `pid`: Identificador del proceso para el cual se desean las estadísticas.
 - `stats`: Estructura definida en el espacio de usuario donde se almacenará la información recopilada.
 
 #### **Valor de Retorno**
-- 
 
 - **0**: Indica que la operación se realizó con éxito.
 - **-ESRCH**: El PID proporcionado no corresponde a ningún proceso en ejecución.
