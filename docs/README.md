@@ -889,3 +889,25 @@ valiosa lección: revisar cuidadosamente el código, especialmente cuando se tra
 
 Estos problemas, aunque desafiantes, reforzaron mi capacidad para enfrentar contratiempos, buscar soluciones y seguir
 adelante incluso en situaciones difíciles.
+
+### **Reflexión Personal**
+
+Al finalizar el proyecto, me di cuenta de que, aunque implementar las llamadas al sistema parecía una tarea compleja al
+principio, el verdadero reto estaba en entender la lógica del kernel. Durante las primeras etapas del proyecto, me
+sentía perdido, ya que no sabía exactamente qué archivos modificar ni cómo hacerlo correctamente. Además, tenía miedo de
+que una línea mal escrita pudiera romper mi máquina virtual, lo que habría significado empezar desde cero.
+
+Conforme avanzaba, comencé a ganar confianza y a comprender mejor lo que se requería. Leer sobre la estructura del
+kernel me permitió identificar que los archivos necesarios para realizar las modificaciones eran pocos y que, en
+realidad, solo necesitaba agregar pequeñas secciones de código en lugares estratégicos. Sin embargo, lo verdaderamente
+complicado era determinar *qué* debía insertar y dónde.
+
+Superar este desafío implicó mucha lectura de documentación oficial y foros, además de paciencia para experimentar y
+equivocarme. Cada problema resuelto reforzó mi entendimiento y me ayudó a avanzar con mayor claridad.
+
+Otra lección importante de este proyecto fue la paciencia. Cada cambio, por más pequeño que fuera, requería recompilar
+el kernel, un proceso que consume tiempo. Esto me enseñó a ser meticuloso y a planificar bien cada ajuste antes de
+proceder.
+
+En resumen, este proyecto no solo amplió mis conocimientos técnicos, sino que también me ayudó a fortalecer habilidades
+clave como la perseverancia, la atención al detalle y la capacidad de enfrentar desafíos complejos con confianza.
