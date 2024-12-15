@@ -596,7 +596,7 @@ Estadísticas de I/O para el PID 2407:
   Bytes de escrituras canceladas: 0
 ```
 
-### **Documentación del módulo `system_stats`**
+## **Documentación del módulo `system_stats`**
 
 ### **Propósito**
 
@@ -852,3 +852,40 @@ Validé los datos obtenidos para asegurar que fueran precisos y útiles.
 Este día fue dedicado a integrar todos los cambios, realizar pruebas completas de todas las syscalls y resolver
 cualquier inconsistencia restante. También comencé la redacción de la documentación para describir el diseño,
 implementación y pruebas realizadas.
+
+### **Responsabilidad, Compromiso y Resolución de Problemas**
+
+A lo largo del proyecto, me enfrenté a varios desafíos que requerían compromiso y una cuidadosa resolución de problemas.
+Los más destacados fueron los siguientes:
+
+#### **1. Entender la estructura del kernel**
+
+El primer problema fue entender el kernel y determinar qué archivos necesitaba modificar para avanzar. Al principio, la
+cantidad de información y la complejidad del sistema resultaban abrumadoras, pero este obstáculo se resolvió dedicando
+tiempo a leer documentación oficial, buscar en foros y revisar ejemplos prácticos. Poco a poco fui comprendiendo cómo el
+sistema estaba organizado y dónde debía trabajar.
+
+#### **2. Llevar la cuenta de llamadas al sistema específicas**
+
+Este fue el desafío más complicado y el que consumió más tiempo. Inicialmente, intenté interceptar directamente las
+llamadas al sistema, lo cual resultaba innecesariamente complejo y poco efectivo. Después de reflexionar, decidí cambiar
+el enfoque y modificar los archivos fuente que ya manejaban estas llamadas. Esto fue un gran avance, pero surgió un
+nuevo problema: las variables definidas en un archivo no eran visibles en otros.
+
+Para solucionarlo, investigué formas de compartir datos entre archivos. Descubrí que podía usar un archivo común, como
+un encabezado (`.h`), para declarar las variables de los contadores y exportarlas para que fueran accesibles desde los
+diferentes módulos del kernel. Finalmente, los contadores comenzaron a funcionar como esperaba.
+
+#### **3. Espacio insuficiente en la máquina virtual**
+
+El tercer gran problema fue cuando mi máquina virtual se quedó sin espacio debido a un error en mi código. Un bucle mal
+programado generaba una enorme cantidad de registros en los logs del sistema cada segundo, lo que saturó el disco en
+cuestión de minutos. Esto dejó a la máquina en un estado crítico: el sistema operativo estaba extremadamente lento y no
+podía abrir aplicaciones básicas.
+
+La solución requirió reiniciar la máquina virtual y trabajar en condiciones limitadas. Tras investigar, encontré un
+comando para borrar los logs y recuperar el espacio perdido. Esto restauró el funcionamiento del sistema y me enseñó una
+valiosa lección: revisar cuidadosamente el código, especialmente cuando se trabaja con algo tan sensible como el kernel.
+
+Estos problemas, aunque desafiantes, reforzaron mi capacidad para enfrentar contratiempos, buscar soluciones y seguir
+adelante incluso en situaciones difíciles.
