@@ -3061,3 +3061,40 @@ SYSCALL_DEFINE2(get_io_throttle, pid_t, pid, struct io_stats __user *, stats) {
 
 	return 0;
 }
+
+SYSCALL_DEFINE1(tamalloc, size_t, size) {
+    long user_return;
+
+    if (size == 0)
+        return -EINVAL;
+
+    /*
+     * Alinear el tamaño de la memoria a reservar a una página.
+     * El objetivo de esto es no desperdiciar memoria. Esto se logra asignando un múltiplo exacto del tamaño de página.
+     * Ejemplo: si el tamaño de página es 4096 bytes, y se solicitan 5000 bytes, se asignarán 8192 bytes.
+     */
+    size = PAGE_ALIGN(size);
+
+    /*
+     * Manejar la asignación y mapeo de la memoria virtual en el espacio de usuario.
+     * Es similar a la llamada al sistema mmap, pero está diseñada para ser utilizada en el espacio de kernel.
+     * El primer parámetro es la dirección base del mapeo, NULL indica que el kernel debe elegir la dirección.
+     * El segundo parámetro es el offset en páginas dentro del archivo, si es que se está mapeando un archivo.
+     * El tercer parámetro es la cantidad de memoria a asignar, en bytes. Esto fue alineado previamente.
+     * El cuarto parámetro son las banderas de protección y de mapeo.
+     * Con "PROT_READ | PROT_WRITE" se indica que la memoria mapeada puede ser leída y escrita.
+     * Con "MAP_PRIVATE" se indica que el mapeo es privado y las modificaciones no se reflejarán en el archivo subyacente (si lo hubiera).
+     * Con "MAP_ANONYMOUS" se indica que el mapeo no está asociado a un archivo.
+     * Con "MAP_NORESERVE" se indica que no se reservará espacio de swap o memoria física al momento de la asignación.
+     * Esto permite que la memoria sea asignada de forma "lazy allocation", es decir, las páginas no se asignan físicamente hasta que se acceden.
+     * El último parámetro es el desplazamiento en el archivo cuando se está mapeando memoria desde un archivo.
+     * En este caso, ya que se está usando "MAP_ANONYMOUS", este parámetro no aplica y se establece en 0.
+     */
+    user_return = vm_mmap(NULL, 0, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, 0);
+
+    if (user_return < 0)
+        return user_return;
+
+    // Retornar la dirección base del bloque de memoria asignado al proceso de usuario.
+    return user_return;
+}
