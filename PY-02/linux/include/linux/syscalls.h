@@ -1198,6 +1198,14 @@ asmlinkage long sys_track_syscall_usage(const char __user *syscall_name, char __
 /* Prototype for the syscall to get the I/O throttle value. */
 asmlinkage long sys_get_io_throttle(pid_t pid, struct io_stats __user *stats);
 
+/* Prototype for the syscall to allocate memory with lazy-zeroing. */
+asmlinkage long sys_tamalloc(size_t size);
+
+/* Prototype for the syscall to track memory statistics of a specific process. */
+asmlinkage long sys_get_mem_stats(pid_t pid, struct mem_stats __user *stats);
+
+/* Prototype for the syscall to track total memory usage across all processes. */
+asmlinkage long sys_get_total_mem_stats(struct total_mem_stats __user *stats);
 
 /*
  * Not a real system call, but a placeholder for syscalls which are
