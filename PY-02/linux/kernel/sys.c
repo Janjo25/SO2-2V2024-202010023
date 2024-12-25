@@ -3201,3 +3201,33 @@ SYSCALL_DEFINE2(get_mem_stats, pid_t, pid, struct mem_stats __user *, stats) {
 
     return 0;
 }
+
+struct total_mem_stats {
+	unsigned long total_reserved_kb;
+	unsigned long total_committed_kb;
+};
+
+SYSCALL_DEFINE1(get_total_mem_stats, struct total_mem_stats __user *, stats) {
+	struct task_struct *task;
+	struct total_mem_stats total_stats = {0, 0};
+	struct mm_struct *mm;
+
+	for_each_process(task) {
+		mm = get_task_mm(task);
+
+		if (!mm) {
+			continue; // Se saltan los procesos sin "mm_struct".
+		}
+
+		// Suma la memoria reservada y comprometida.
+		total_stats.total_reserved_kb += mm->total_vm << (PAGE_SHIFT - 10); // Páginas a KB.
+		total_stats.total_committed_kb += get_mm_rss(mm) << (PAGE_SHIFT - 10); // RSS a KB.
+
+		mmput(mm);
+	}
+
+	if (copy_to_user(stats, &total_stats, sizeof(total_stats)))
+		return -EFAULT;
+
+	return 0;
+}
