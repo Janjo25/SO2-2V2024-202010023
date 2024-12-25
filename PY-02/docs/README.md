@@ -171,38 +171,41 @@ SYSCALL_DEFINE2(capture_memory_snapshot, void __user *, buf, size_t, len);
 ### **Código Implementado**
 
 ```c
-SYSCALL_DEFINE2(capture_memory_snapshot, void __user *, buf, size_t, len) {
-	struct sysinfo memory_information;
-	char snapshot[256]; // En este buffer se almacenará el snapshot que se enviará al espacio de usuario.
-	int user_return; // Variable para retornar el snapshot al espacio de usuario.
+SYSCALL_DEFINE1(tamalloc, size_t, size) {
+    long user_return;
 
-	si_meminfo(&memory_information);
+    if (size == 0)
+        return -EINVAL;
 
-	// Formato del snapshot.
-	snprintf(
-		snapshot, sizeof(snapshot),
-		"Memoria Total: %lu kB\n"
-		"Memory Libre: %lu kB\n"
-		"Buffers: %lu kB\n"
-		"Memoria Cacheada: %lu kB\n"
-		"Swap Total: %lu kB\n"
-		"Swap Libre: %lu kB\n",
-		memory_information.totalram << (PAGE_SHIFT - 10),
-		memory_information.freeram << (PAGE_SHIFT - 10),
-		memory_information.bufferram << (PAGE_SHIFT - 10),
-		global_node_page_state(NR_FILE_PAGES) << (PAGE_SHIFT - 10),
-		memory_information.totalswap << (PAGE_SHIFT - 10),
-		memory_information.freeswap << (PAGE_SHIFT - 10)
-	);
+    /*
+     * Alinear el tamaño de la memoria a reservar a una página.
+     * El objetivo de esto es no desperdiciar memoria. Esto se logra asignando un múltiplo exacto del tamaño de página.
+     * Ejemplo: si el tamaño de página es 4096 bytes, y se solicitan 5000 bytes, se asignarán 8192 bytes.
+     */
+    size = PAGE_ALIGN(size);
 
-	if (len < strlen(snapshot) + 1)
-		return -EINVAL;
+    /*
+     * Manejar la asignación y mapeo de la memoria virtual en el espacio de usuario.
+     * Es similar a la llamada al sistema mmap, pero está diseñada para ser utilizada en el espacio de kernel.
+     * El primer parámetro es la dirección base del mapeo, NULL indica que el kernel debe elegir la dirección.
+     * El segundo parámetro es el offset en páginas dentro del archivo, si es que se está mapeando un archivo.
+     * El tercer parámetro es la cantidad de memoria a asignar, en bytes. Esto fue alineado previamente.
+     * El cuarto parámetro son las banderas de protección y de mapeo.
+     * Con "PROT_READ | PROT_WRITE" se indica que la memoria mapeada puede ser leída y escrita.
+     * Con "MAP_PRIVATE" se indica que el mapeo es privado y las modificaciones no se reflejarán en el archivo subyacente (si lo hubiera).
+     * Con "MAP_ANONYMOUS" se indica que el mapeo no está asociado a un archivo.
+     * Con "MAP_NORESERVE" se indica que no se reservará espacio de swap o memoria física al momento de la asignación.
+     * Esto permite que la memoria sea asignada de forma "lazy allocation", es decir, las páginas no se asignan físicamente hasta que se acceden.
+     * El último parámetro es el desplazamiento en el archivo cuando se está mapeando memoria desde un archivo.
+     * En este caso, ya que se está usando "MAP_ANONYMOUS", este parámetro no aplica y se establece en 0.
+     */
+    user_return = vm_mmap(NULL, 0, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, 0);
 
-	user_return = copy_to_user(buf, snapshot, strlen(snapshot) + 1);
-	if (user_return)
-		return -EFAULT;
+    if (user_return < 0)
+        return user_return;
 
-	return 0;
+    // Retornar la dirección base del bloque de memoria asignado al proceso de usuario.
+    return user_return;
 }
 ```
 
@@ -293,66 +296,105 @@ SYSCALL_DEFINE3(track_syscall_usage, const char __user *, syscall_name, char __u
 ### **Código Implementado**
 
 ```c
-/* Custom global variables used in the usage tracking syscall. */
-atomic_t open_count = ATOMIC_INIT(0);
-atomic_t read_count = ATOMIC_INIT(0);
-atomic_t write_count = ATOMIC_INIT(0);
-atomic_t fork_count = ATOMIC_INIT(0);
+struct mem_stats {
+    unsigned long reserved_kb;
+    unsigned long committed_kb;
+    unsigned int oom_score;
+};
 
-EXPORT_SYMBOL(open_count);
-EXPORT_SYMBOL(read_count);
-EXPORT_SYMBOL(write_count);
-EXPORT_SYMBOL(fork_count);
+SYSCALL_DEFINE2(get_mem_stats, pid_t, pid, struct mem_stats __user *, stats) {
+    struct task_struct *task; // Puntero a la estructura del kernel que representa al proceso con el PID especificado.
+    struct mm_struct *mm; // Puntero a la estructura de memoria del proceso.
+    struct mem_stats kstats; // Estructura para almacenar las estadísticas calculadas.
+    unsigned long rss_pages; // Número de páginas RSS, que representa la memoria física utilizada por el proceso.
+    unsigned long swap_pages = 0; // Número de páginas utilizadas en SWAP por el proceso.
+    unsigned long total_ram_pages; // Número total de páginas de RAM en el sistema.
+    unsigned long total_swap_pages = 0; // Número total de páginas de SWAP en el sistema.
+    unsigned long total_pages; // Suma de "total_ram_pages" y "total_swap_pages".
+    long points; // Puntaje base para calcular el OOM Score.
+    long adjust; // Ajuste del "oom_score_adj" para modificar el puntaje base.
 
-SYSCALL_DEFINE3(track_syscall_usage, const char __user *, syscall_name, char __user *, buffer, size_t, len) {
-    char name[16]; // Este buffer contendrá el nombre de la syscall solicitada.
-    char output[128]; // Este buffer contendrá la salida que se enviará al espacio de usuario.
-    int user_return; // Variable para retornar el snapshot al espacio de usuario.
+    rcu_read_lock();
+    task = pid_task(find_vpid(pid), PIDTYPE_PID);
+    rcu_read_unlock();
 
-    printk(KERN_INFO "track_syscall_usage: syscall invoked\n");
+    if (!task)
+        return -ESRCH;
 
-    // Copiar el nombre de la syscall desde el espacio de usuario.
-    if (copy_from_user(name, syscall_name, sizeof(name))) {
-        printk(KERN_ERR "track_syscall_usage: copy_from_user failed\n");
+    // Accede a la estructura de memoria del proceso, o sea, toda la información sobre el espacio de memoria.
+    mm = get_task_mm(task);
 
+    // No hay espacio de memoria asignado.
+    if (!mm)
+        return -ENOMEM;
+
+    // Calcula la memoria reservada y comprometida.
+    kstats.reserved_kb = mm->total_vm << PAGE_SHIFT - 10; // Páginas a KB.
+    kstats.committed_kb = get_mm_rss(mm) << PAGE_SHIFT - 10; // RSS a KB.
+
+    // Obtiene el RSS en páginas.
+    rss_pages = get_mm_rss(mm);
+
+    /*
+     * El propósito de "#ifdef" es verificar si un macro está definida antes de usarlo.
+     * Esto permite incluir o excluir bloques de código dependiendo de la configuración.
+     * En este caso, como se usó el macro "CONFIG_SWAP", se verifica si el sistema tiene soporte para SWAP.
+     * Si está definido, se incluye el bloque de código que obtiene el número de páginas de SWAP.
+     */
+#ifdef CONFIG_SWAP
+    swap_pages = get_mm_counter(mm, MM_SWAPENTS); // Obtiene el número de páginas que el proceso movió al área de SWAP.
+#endif
+
+    // Obtiene el número total de páginas de memoria RAM física disponibles en el sistema.
+    total_ram_pages = get_num_physpages();
+
+#ifdef CONFIG_SWAP
+    total_swap_pages = atomic_read(&total_swap_pages); // Obtiene el número total de páginas de SWAP en el sistema.
+#endif
+
+    // Se consigue el total para usarlo como base al normalizar el uso de memoria del proceso.
+    total_pages = total_ram_pages + total_swap_pages;
+
+    // Evita la división por cero.
+    if (!total_pages)
+        total_pages = 1;
+
+    // Calcula un puntaje inicial que representa el uso de memoria del proceso en una escala de 0 a 1000.
+    points = rss_pages + swap_pages;
+    points = points * 1000 / total_pages;
+
+    // Obtiene el ajuste de prioridad para el OOM Killer del proceso.
+    adjust = task->signal->oom_score_adj;
+
+    /*
+     * Ajusta el puntaje del proceso según oom_score_adj, reflejando su prioridad.
+     * Valores negativos protegen al proceso, valores positivos lo priorizan para ser terminado.
+     */
+    if (adjust < 0) {
+        if (-adjust > 31) // Ajuste negativo: disminuye el puntaje.
+            points = 0;
+        else
+            points /= 1UL << -adjust;
+    } else if (adjust > 0) {
+        if (adjust > 31) // Ajuste positivo: incrementa el puntaje.
+            points = 1000;
+        else
+            points *= 1UL << adjust;
+    }
+
+    // Asegurar que el puntaje esté en el rango de 0 a 1000.
+    if (points > 1000)
+        points = 1000;
+
+    if (points < 0)
+        points = 0;
+
+    kstats.oom_score = (unsigned int) points;
+
+    mmput(mm); // Libera la referencia a la estructura "mm_struct".
+
+    if (copy_to_user(stats, &kstats, sizeof(kstats)))
         return -EFAULT;
-    }
-
-    printk(KERN_INFO "track_syscall_usage: syscall_name copied: %s\n", name);
-
-    // Obtener la salida según la syscall solicitada.
-    if (strcmp(name, "open") == 0) {
-        // printk(KERN_INFO "track_syscall_usage: open count is %d\n", atomic_read(&open_count));
-        snprintf(output, sizeof(output), "open called %d times\n", atomic_read(&open_count));
-    } else if (strcmp(name, "read") == 0) {
-        // printk(KERN_INFO "track_syscall_usage: read count is %d\n", atomic_read(&read_count));
-        snprintf(output, sizeof(output), "read called %d times\n", atomic_read(&read_count));
-    } else if (strcmp(name, "write") == 0) {
-        // printk(KERN_INFO "track_syscall_usage: write count is %d\n", atomic_read(&write_count));
-        snprintf(output, sizeof(output), "write called %d times\n", atomic_read(&write_count));
-    } else if (strcmp(name, "fork") == 0) {
-        // printk(KERN_INFO "track_syscall_usage: fork count is %d\n", atomic_read(&fork_count));
-        snprintf(output, sizeof(output), "fork called %d times\n", atomic_read(&fork_count));
-    } else {
-        printk(KERN_ERR "track_syscall_usage: invalid syscall name: %s\n", name);
-
-        return -EINVAL;
-    }
-
-    if (len < strlen(output) + 1) {
-        printk(KERN_ERR "track_syscall_usage: buffer size too small\n");
-
-        return -EINVAL;
-    }
-
-    user_return = copy_to_user(buffer, output, strlen(output) + 1);
-    if (user_return) {
-        printk(KERN_ERR "track_syscall_usage: copy_to_user failed\n");
-
-        return -EFAULT;
-    }
-
-    printk(KERN_INFO "track_syscall_usage: syscall completed successfully\n");
 
     return 0;
 }
@@ -476,42 +518,31 @@ SYSCALL_DEFINE2(get_io_throttle, pid_t, pid, struct io_stats __user *, stats);
 ### **Código Implementado**
 
 ```c
-struct io_stats {
-	u64 rchar;
-	u64 wchar;
-	u64 syscr;
-	u64 syscw;
-	u64 read_bytes;
-	u64 write_bytes;
-	u64 cancelled_write_bytes;
+struct total_mem_stats {
+	unsigned long total_reserved_kb;
+	unsigned long total_committed_kb;
 };
 
-SYSCALL_DEFINE2(get_io_throttle, pid_t, pid, struct io_stats __user *, stats) {
+SYSCALL_DEFINE1(get_total_mem_stats, struct total_mem_stats __user *, stats) {
 	struct task_struct *task;
-	struct io_stats kernel_stats;
+	struct total_mem_stats total_stats = {0, 0};
+	struct mm_struct *mm;
 
-	rcu_read_lock(); // Protege contra cambios concurrentes mientras se busca la tarea.
-	task = pid_task(find_vpid(pid), PIDTYPE_PID); // Encuentra la tarea asociada al PID.
-	rcu_read_unlock();
+	for_each_process(task) {
+		mm = get_task_mm(task);
 
-	// Si no se encuentra la tarea, retorna un error notificando que no existe la tarea.
-	if (!task)
-		return -ESRCH;
+		if (!mm) {
+			continue; // Se saltan los procesos sin "mm_struct".
+		}
 
-	// Se verifica si el usuario tiene permisos suficientes para acceder al proceso objetivo.
-	if (!ptrace_may_access(task, PTRACE_MODE_READ_REALCREDS))
-		return -EACCES;
+		// Suma la memoria reservada y comprometida.
+		total_stats.total_reserved_kb += mm->total_vm << (PAGE_SHIFT - 10); // Páginas a KB.
+		total_stats.total_committed_kb += get_mm_rss(mm) << (PAGE_SHIFT - 10); // RSS a KB.
 
-	// Llena la estructura con estadísticas de I/O que será retornada al usuario.
-	kernel_stats.rchar = task->ioac.rchar;
-	kernel_stats.wchar = task->ioac.wchar;
-	kernel_stats.syscr = task->ioac.syscr;
-	kernel_stats.syscw = task->ioac.syscw;
-	kernel_stats.read_bytes = task->ioac.read_bytes;
-	kernel_stats.write_bytes = task->ioac.write_bytes;
-	kernel_stats.cancelled_write_bytes = task->ioac.cancelled_write_bytes;
+		mmput(mm);
+	}
 
-	if (copy_to_user(stats, &kernel_stats, sizeof(kernel_stats)))
+	if (copy_to_user(stats, &total_stats, sizeof(total_stats)))
 		return -EFAULT;
 
 	return 0;
