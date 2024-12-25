@@ -217,23 +217,58 @@ usuario.
 #### Código del Usuario
 
 ```c
-#include <errno.h>
 #include <stdio.h>
-#include <string.h>
+#include <stdlib.h>
+#include <time.h>
 #include <unistd.h>
 
-#define SYSCALL_NUM 462
+#define SYSCALL_NUM 465
 
 int main() {
-    char buffer[512] = {0};
+    printf("PID del programa: %d\n", getpid());
 
-    const long user_return = syscall(SYSCALL_NUM, buffer, sizeof(buffer));
+    printf("Presiona ENTER para continuar...\n");
+    getchar();
 
-    if (user_return == 0) {
-        printf("Snapshot de memoria:\n%s\n", buffer);
-    } else {
-        printf("Error al ejecutar la syscall: %s\n", strerror(errno));
+    const size_t total_size = 10 * 1024 * 1024; // Se asignan 10 MB de memoria.
+
+    char *buffer = (char *) syscall(SYSCALL_NUM, total_size);
+
+    if ((long) buffer < 0) {
+        perror("fallo en la llamada al sistema");
+
+        return 1;
     }
+
+    printf("Se asignaron 10 MB de memoria en la dirección: %p\n", buffer);
+
+    printf("Presiona ENTER para empezar a leer la memoria byte por byte...\n");
+    getchar();
+
+    // Inicializa el generador de números aleatorios con una semilla basada en el tiempo actual.
+    srand(time(NULL));
+
+    for (size_t i = 0; i < total_size; i++) {
+        const char current_byte = buffer[i]; // Almacena el valor del byte actual para verificar su inicialización.
+
+        if (current_byte != 0) {
+            printf("La memoria no se inicializó en cero en el byte %zu\n", i);
+
+            return 1;
+        }
+
+        // Genera un carácter aleatorio entre 'A' y 'Z' y lo escribe en el byte actual.
+        const char random_letter = 'A' + rand() % 26;
+        buffer[i] = random_letter;
+
+        if (i % (1024 * 1024) == 0 && i > 0) {
+            printf("Verificados %zu MB...\n", i / (1024 * 1024));
+            sleep(1); // Pausa de 1 segundo para que el usuario pueda ver el progreso.
+        }
+    }
+
+    printf("Toda la memoria se verificó que está inicializada en cero. Presiona ENTER para salir.\n");
+    getchar();
 
     return 0;
 }
