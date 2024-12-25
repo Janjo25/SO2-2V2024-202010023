@@ -3098,3 +3098,106 @@ SYSCALL_DEFINE1(tamalloc, size_t, size) {
     // Retornar la dirección base del bloque de memoria asignado al proceso de usuario.
     return user_return;
 }
+
+struct mem_stats {
+    unsigned long reserved_kb;
+    unsigned long committed_kb;
+    unsigned int oom_score;
+};
+
+SYSCALL_DEFINE2(get_mem_stats, pid_t, pid, struct mem_stats __user *, stats) {
+    struct task_struct *task; // Puntero a la estructura del kernel que representa al proceso con el PID especificado.
+    struct mm_struct *mm; // Puntero a la estructura de memoria del proceso.
+    struct mem_stats kstats; // Estructura para almacenar las estadísticas calculadas.
+    unsigned long rss_pages; // Número de páginas RSS, que representa la memoria física utilizada por el proceso.
+    unsigned long swap_pages = 0; // Número de páginas utilizadas en SWAP por el proceso.
+    unsigned long total_ram_pages; // Número total de páginas de RAM en el sistema.
+    unsigned long total_swap_pages = 0; // Número total de páginas de SWAP en el sistema.
+    unsigned long total_pages; // Suma de "total_ram_pages" y "total_swap_pages".
+    long points; // Puntaje base para calcular el OOM Score.
+    long adjust; // Ajuste del "oom_score_adj" para modificar el puntaje base.
+
+    rcu_read_lock();
+    task = pid_task(find_vpid(pid), PIDTYPE_PID);
+    rcu_read_unlock();
+
+    if (!task)
+        return -ESRCH;
+
+    // Accede a la estructura de memoria del proceso, o sea, toda la información sobre el espacio de memoria.
+    mm = get_task_mm(task);
+
+    // No hay espacio de memoria asignado.
+    if (!mm)
+        return -ENOMEM;
+
+    // Calcula la memoria reservada y comprometida.
+    kstats.reserved_kb = mm->total_vm << PAGE_SHIFT - 10; // Páginas a KB.
+    kstats.committed_kb = get_mm_rss(mm) << PAGE_SHIFT - 10; // RSS a KB.
+
+    // Obtiene el RSS en páginas.
+    rss_pages = get_mm_rss(mm);
+
+    /*
+     * El propósito de "#ifdef" es verificar si un macro está definida antes de usarlo.
+     * Esto permite incluir o excluir bloques de código dependiendo de la configuración.
+     * En este caso, como se usó el macro "CONFIG_SWAP", se verifica si el sistema tiene soporte para SWAP.
+     * Si está definido, se incluye el bloque de código que obtiene el número de páginas de SWAP.
+     */
+#ifdef CONFIG_SWAP
+    swap_pages = get_mm_counter(mm, MM_SWAPENTS); // Obtiene el número de páginas que el proceso movió al área de SWAP.
+#endif
+
+    // Obtiene el número total de páginas de memoria RAM física disponibles en el sistema.
+    total_ram_pages = get_num_physpages();
+
+#ifdef CONFIG_SWAP
+    total_swap_pages = atomic_read(&total_swap_pages); // Obtiene el número total de páginas de SWAP en el sistema.
+#endif
+
+    // Se consigue el total para usarlo como base al normalizar el uso de memoria del proceso.
+    total_pages = total_ram_pages + total_swap_pages;
+
+    // Evita la división por cero.
+    if (!total_pages)
+        total_pages = 1;
+
+    // Calcula un puntaje inicial que representa el uso de memoria del proceso en una escala de 0 a 1000.
+    points = rss_pages + swap_pages;
+    points = points * 1000 / total_pages;
+
+    // Obtiene el ajuste de prioridad para el OOM Killer del proceso.
+    adjust = task->signal->oom_score_adj;
+
+    /*
+     * Ajusta el puntaje del proceso según oom_score_adj, reflejando su prioridad.
+     * Valores negativos protegen al proceso, valores positivos lo priorizan para ser terminado.
+     */
+    if (adjust < 0) {
+        if (-adjust > 31) // Ajuste negativo: disminuye el puntaje.
+            points = 0;
+        else
+            points /= 1UL << -adjust;
+    } else if (adjust > 0) {
+        if (adjust > 31) // Ajuste positivo: incrementa el puntaje.
+            points = 1000;
+        else
+            points *= 1UL << adjust;
+    }
+
+    // Asegurar que el puntaje esté en el rango de 0 a 1000.
+    if (points > 1000)
+        points = 1000;
+
+    if (points < 0)
+        points = 0;
+
+    kstats.oom_score = (unsigned int) points;
+
+    mmput(mm); // Libera la referencia a la estructura "mm_struct".
+
+    if (copy_to_user(stats, &kstats, sizeof(kstats)))
+        return -EFAULT;
+
+    return 0;
+}
