@@ -663,48 +663,38 @@ El siguiente ejemplo muestra cómo realizar una llamada a `get_io_throttle` desd
 #include <stdlib.h>
 #include <unistd.h>
 
-struct io_stats {
-    unsigned long long rchar;
-    unsigned long long wchar;
-    unsigned long long syscr;
-    unsigned long long syscw;
-    unsigned long long read_bytes;
-    unsigned long long write_bytes;
-    unsigned long long cancelled_write_bytes;
+#define SYS_GET_TOTAL_MEM_STATS 467
+
+struct total_mem_stats {
+    unsigned long total_reserved_kb;
+    unsigned long total_committed_kb;
 };
 
-#define SYSCALL_NUM 464
+int main() {
+    struct total_mem_stats stats;
 
-/*
- * Con "argc" se cuenta la cantidad de argumentos pasados al programa. El primer argumento es el nombre del programa.
- * Con "argv" se almacenan los argumentos pasados al programa en forma de arreglo de cadenas.
- */
-int main(const int argc, char *argv[]) {
-    struct io_stats stats;
+    const long result = syscall(SYS_GET_TOTAL_MEM_STATS, &stats);
 
-    // Si no se pasó un PID como argumento, se explica cómo usar el programa.
-    if (argc != 2) {
-        fprintf(stderr, "Uso: %s <PID>\n", argv[0]);
+    if (result != 0) {
+        perror("fallo al obtener estadísticas totales");
 
-        return 1;
+        return EXIT_FAILURE;
     }
 
-    const pid_t pid = atoi(argv[1]); // NOLINT(*-err34-c)
+    printf("Estadísticas totales de memoria:\n");
 
-    if (syscall(SYSCALL_NUM, pid, &stats) == 0) {
-        printf("Estadísticas de I/O para el PID %d:\n", pid);
-        printf("  Bytes leídos: %llu\n", stats.rchar);
-        printf("  Bytes escritos: %llu\n", stats.wchar);
-        printf("  Llamadas a read: %llu\n", stats.syscr);
-        printf("  Llamadas a write: %llu\n", stats.syscw);
-        printf("  Bytes leídos del disco: %llu\n", stats.read_bytes);
-        printf("  Bytes escritos al disco: %llu\n", stats.write_bytes);
-        printf("  Bytes de escrituras canceladas: %llu\n", stats.cancelled_write_bytes);
-    } else {
-        perror("fallo en la llamada al sistema");
-    }
+    printf(
+        "  Memoria total reservada: %lu KB (%.2f MB)\n",
+        stats.total_reserved_kb,
+        stats.total_reserved_kb / 1024.0
+    );
+    printf(
+        "  Memoria total comprometida: %lu KB (%.2f MB)\n",
+        stats.total_committed_kb,
+        stats.total_committed_kb / 1024.0
+    );
 
-    return 0;
+    return EXIT_SUCCESS;
 }
 ```
 
