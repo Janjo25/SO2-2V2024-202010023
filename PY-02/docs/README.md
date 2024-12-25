@@ -442,65 +442,133 @@ El siguiente ejemplo muestra cómo utilizar la syscall `track_syscall_usage` des
 #### Código del Usuario
 
 ```c
+#include <ctype.h>
+#include <dirent.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
-#define SYSCALL_NUM 463
+#define SYSCALL_NUM 466
 
-int main() {
-    char syscall_name[16];
-    char buffer[128];
+struct mem_stats {
+    unsigned long reserved_kb;
+    unsigned long committed_kb;
+    unsigned int oom_score;
+};
 
-    // Solicitar contador para "open".
-    strncpy(syscall_name, "open", sizeof(syscall_name));
+// Función para imprimir encabezados de la tabla
+void print_table_headers() {
+    printf(
+        "%-10s %-15s %-18s %-10s %-15s\n",
+        "PID",
+        "Reservada (KB)",
+        "Comprometida (KB)",
+        "OOM Score",
+        "% Comprometida"
+    );
+    printf(
+        "%-10s %-15s %-18s %-10s %-15s\n",
+        "==========",
+        "===============",
+        "==================",
+        "==========",
+        "============="
+    );
+}
 
-    int user_return = syscall(SYSCALL_NUM, syscall_name, buffer, sizeof(buffer));
-    if (user_return < 0) {
-        perror("fallo en la llamada al sistema (open)");
+/*
+ * Función para verificar si una cadena es completamente numérica.
+ * Esto se hace para filtrar los directorios en "/proc" que no son procesos.
+ */
+int is_numeric(const char *str) {
+    while (*str) {
+        if (!isdigit(*str))
+            return 0;
 
-        return 1;
+        str++;
     }
 
-    printf("Estadísticas de uso de llamadas al sistema: %s\n", buffer);
+    return 1;
+}
 
-    // Solicitar contador para "read".
-    strncpy(syscall_name, "read", sizeof(syscall_name));
 
-    user_return = syscall(SYSCALL_NUM, syscall_name, buffer, sizeof(buffer));
-    if (user_return < 0) {
-        perror("fallo en la llamada al sistema (read)");
+// Función para imprimir las estadísticas con el porcentaje
+void print_mem_stats(const pid_t pid, const struct mem_stats stats) {
+    double percentage = 0.0;
 
-        return 1;
+    if (stats.reserved_kb != 0) {
+        percentage = (double) stats.committed_kb / (double) stats.reserved_kb * 100.0;
     }
 
-    printf("Estadísticas de uso de llamadas al sistema: %s\n", buffer);
+    printf(
+        "%-10d %-15lu %-18lu %-10u %.2f%%\n",
+        pid,
+        stats.reserved_kb,
+        stats.committed_kb,
+        stats.oom_score,
+        percentage
+    );
+}
 
-    // Solicitar contador para "write".
-    strncpy(syscall_name, "write", sizeof(syscall_name));
+int main(const int argc, char *argv[]) {
+    if (argc != 2) {
+        fprintf(stderr, "Uso: %s <PID (0 para todos)>\n", argv[0]);
 
-    user_return = syscall(SYSCALL_NUM, syscall_name, buffer, sizeof(buffer));
-    if (user_return < 0) {
-        perror("fallo en la llamada al sistema (write)");
-
-        return 1;
+        return EXIT_FAILURE;
     }
 
-    printf("Estadísticas de uso de llamadas al sistema: %s\n", buffer);
+    const pid_t pid = atoi(argv[1]);
 
-    // Solicitar contador para "fork".
-    strncpy(syscall_name, "fork", sizeof(syscall_name));
+    // Si el PID es 0, se deben listar todos los procesos. Para lograr esto, se abre el directorio "/proc".
+    if (pid == 0) {
+        DIR *proc_dir = opendir("/proc");
 
-    user_return = syscall(SYSCALL_NUM, syscall_name, buffer, sizeof(buffer));
-    if (user_return < 0) {
-        perror("fallo en la llamada al sistema (fork)");
+        if (!proc_dir) {
+            perror("fallo al abrir '/proc'");
 
-        return 1;
+            return EXIT_FAILURE;
+        }
+
+        struct dirent *entry;
+
+        print_table_headers();
+
+        while ((entry = readdir(proc_dir)) != NULL) {
+            if (is_numeric(entry->d_name)) {
+                const pid_t current_pid = atoi(entry->d_name);
+                struct mem_stats stats;
+
+                // Se hace la llamada para el PID actual.
+                const long result = syscall(SYSCALL_NUM, current_pid, &stats);
+
+                /*
+                 * Si la llamada es exitosa, se imprimen las estadísticas.
+                 * Si la llamada falla, se ignora el proceso y se continúa con el siguiente.
+                 */
+                if (result == 0) {
+                    print_mem_stats(current_pid, stats);
+                }
+            }
+        }
+
+        closedir(proc_dir);
+    } else {
+        struct mem_stats stats;
+
+        const long result = syscall(SYSCALL_NUM, pid, &stats);
+
+        if (result == 0) {
+            print_table_headers();
+            print_mem_stats(pid, stats);
+        } else {
+            fprintf(stderr, "Error al obtener estadísticas para PID %d: %s\n", pid, strerror(-result));
+
+            return EXIT_FAILURE;
+        }
     }
 
-    printf("Contadores de uso de llamadas al sistema: %s\n", buffer);
-
-    return 0;
+    return EXIT_SUCCESS;
 }
 ```
 
