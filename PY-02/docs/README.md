@@ -833,37 +833,30 @@ para garantizar el correcto funcionamiento de las tres syscalls.
 A lo largo del proyecto, me enfrenté a varios desafíos que requerían compromiso y una cuidadosa resolución de problemas.
 Los más destacados fueron los siguientes:
 
-#### **1. Entender la estructura del kernel**
+#### **1. Implementar la primera llamada al sistema (`tamalloc`)**
 
-El primer problema fue entender el kernel y determinar qué archivos necesitaba modificar para avanzar. Al principio, la
-cantidad de información y la complejidad del sistema resultaban abrumadoras, pero este obstáculo se resolvió dedicando
-tiempo a leer documentación oficial, buscar en foros y revisar ejemplos prácticos. Poco a poco fui comprendiendo cómo el
-sistema estaba organizado y dónde debía trabajar.
+El primer problema fue entender cómo implementar la syscall `tamalloc`. Al principio, no comprendía la teoría detrás de
+*lazy-zeroing* ni cómo debía funcionar el algoritmo. Intenté avanzar sin entender del todo el concepto, pero rápidamente
+me di cuenta de que no estaba progresando. Esto me llevó a detenerme y dedicar tiempo a ver videos y leer documentación
+sobre asignación de memoria en el kernel.
 
-#### **2. Llevar la cuenta de llamadas al sistema específicas**
+Una vez que entendí la utilidad y los fundamentos teóricos, pude identificar la solución. Resultó ser más sencilla de lo
+que pensaba inicialmente: una línea clave de código resolvía el problema. Esta experiencia me enseñó que comprender la
+teoría antes de lanzarse a la práctica es esencial para evitar perder tiempo valioso.
 
-Este fue el desafío más complicado y el que consumió más tiempo. Inicialmente, intenté interceptar directamente las
-llamadas al sistema, lo cual resultaba innecesariamente complejo y poco efectivo. Después de reflexionar, decidí cambiar
-el enfoque y modificar los archivos fuente que ya manejaban estas llamadas. Esto fue un gran avance, pero surgió un
-nuevo problema: las variables definidas en un archivo no eran visibles en otros.
+#### **2. Obtener estadísticas de todos los procesos en `get_mem_stats`**
 
-Para solucionarlo, investigué formas de compartir datos entre archivos. Descubrí que podía usar un archivo común, como
-un encabezado (`.h`), para declarar las variables de los contadores y exportarlas para que fueran accesibles desde los
-diferentes módulos del kernel. Finalmente, los contadores comenzaron a funcionar como esperaba.
+Otro reto significativo surgió al implementar la funcionalidad para recolectar estadísticas de todos los procesos cuando
+el PID era `0`. No sabía cómo iterar sobre todos los procesos activos de manera eficiente. Para solucionarlo, utilicé
+`/proc` como base para identificar procesos válidos recorriendo los directorios numéricos que correspondían a PIDs.
 
-#### **3. Espacio insuficiente en la máquina virtual**
+El principal desafío fue manejar de forma segura las llamadas para evitar errores si un proceso terminaba durante la
+iteración. Implementé validaciones adicionales utilizando funciones como `opendir` y `readdir`, lo que permitió
+recolectar datos con precisión. Este problema me enseñó a aprovechar las herramientas disponibles y a ser metódico en el
+manejo de estructuras compartidas.
 
-El tercer gran problema fue cuando mi máquina virtual se quedó sin espacio debido a un error en mi código. Un bucle mal
-programado generaba una enorme cantidad de registros en los logs del sistema cada segundo, lo que saturó el disco en
-cuestión de minutos. Esto dejó a la máquina en un estado crítico: el sistema operativo estaba extremadamente lento y no
-podía abrir aplicaciones básicas.
-
-La solución requirió reiniciar la máquina virtual y trabajar en condiciones limitadas. Tras investigar, encontré un
-comando para borrar los logs y recuperar el espacio perdido. Esto restauró el funcionamiento del sistema y me enseñó una
-valiosa lección: revisar cuidadosamente el código, especialmente cuando se trabaja con algo tan sensible como el kernel.
-
-Estos problemas, aunque desafiantes, reforzaron mi capacidad para enfrentar contratiempos, buscar soluciones y seguir
-adelante incluso en situaciones difíciles.
+Estos problemas, aunque desafiantes, reforzaron mis habilidades técnicas y mi capacidad para enfrentar contratiempos,
+buscar soluciones y aprender de cada experiencia.
 
 ### **Reflexión Personal**
 
