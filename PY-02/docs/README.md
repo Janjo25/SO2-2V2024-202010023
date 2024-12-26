@@ -434,35 +434,25 @@ gcc -o get_mem_stats get_mem_stats.c
 
 ---
 
-## **Documentación de la llamada al sistema `get_io_throttle`**
+### **3. Llamada al Sistema: `get_total_mem_stats`**
 
-### **Propósito**
+#### **Propósito**
 
-El módulo `get_io_throttle` permite a los usuarios obtener información estadística sobre el uso de I/O de un proceso
-específico en el sistema, identificado por su PID. Este módulo facilita el análisis del comportamiento de entrada/salida
-de aplicaciones, mostrando detalles clave como la cantidad de bytes leídos y escritos, número de llamadas de lectura y
-escritura realizadas, bytes leídos desde disco, bytes escritos a disco, y bytes de escritura cancelados.
+Recolecta estadísticas de memoria reservada y comprometida para todos los procesos en el sistema.
 
-### **Diseño**
+#### **Diseño**
 
-#### **Definición**
+##### **Definición**
 
 ```c
-SYSCALL_DEFINE2(get_io_throttle, pid_t, pid, struct io_stats __user *, stats);
+SYSCALL_DEFINE1(get_total_mem_stats, struct total_mem_stats __user *, stats);
 ```
 
-#### **Parámetros**
+##### **Parámetros**
 
-- `pid`: Identificador del proceso para el cual se desean las estadísticas.
-- `stats`: Estructura definida en el espacio de usuario donde se almacenará la información recopilada.
+- **`stats`**: Puntero a la estructura donde se almacenarán las estadísticas globales.
 
-#### **Valor de Retorno**
-
-- **0**: Indica que la operación se realizó con éxito.
-- **-ESRCH**: El PID proporcionado no corresponde a ningún proceso en ejecución.
-- **-EFAULT**: Ocurrió un error al copiar los datos al espacio de usuario.
-
-### **Código Implementado**
+##### **Código Implementado**
 
 ```c
 struct total_mem_stats {
@@ -496,11 +486,9 @@ SYSCALL_DEFINE1(get_total_mem_stats, struct total_mem_stats __user *, stats) {
 }
 ```
 
-### **Ejemplo de Uso**
+#### **Ejemplo de Uso en Espacio de Usuario**
 
-El siguiente ejemplo muestra cómo realizar una llamada a `get_io_throttle` desde un programa de espacio de usuario.
-
-#### Código del Usuario
+##### Código del Usuario
 
 ```c
 #include <stdio.h>
@@ -542,27 +530,14 @@ int main() {
 }
 ```
 
-#### Compilación y Ejecución
-
-Compilar el programa con:
+##### **Compilación y Ejecución**
 
 ```bash
-gcc -o get_io_throttle get_io_throttle.c
-./get_io_throttle <pid>
+gcc -o get_total_mem_stats get_total_mem_stats.c
+./get_total_mem_stats
 ```
 
-#### Salida Esperada
-
-```plaintext
-Estadísticas de I/O para el PID 2407:
-  Bytes leídos: 160646
-  Bytes escritos: 5030
-  Llamadas a read: 374
-  Llamadas a write: 225
-  Bytes leídos del disco: 57344
-  Bytes escritos al disco: 0
-  Bytes de escrituras canceladas: 0
-```
+---
 
 ## **Documentación del módulo `system_stats`**
 
