@@ -537,7 +537,39 @@ gcc -o get_total_mem_stats get_total_mem_stats.c
 ./get_total_mem_stats
 ```
 
----
+## **Análisis de los Resultados Obtenidos: Memoria Solicitada vs. Memoria Realmente Utilizada**
+
+El experimento realizado con la syscall `tamalloc` permitió observar cómo se comporta el sistema al asignar y utilizar
+bloques de memoria. A continuación, se presenta un análisis de los resultados:
+
+1. **Memoria Solicitada:**
+    - Durante la ejecución del programa, se solicitaron bloques de memoria de tamaño fijo (por ejemplo, 10 MB) a través
+      de la syscall `tamalloc`.
+    - Este valor representa la cantidad de memoria virtual asignada al proceso por el kernel.
+
+2. **Memoria Realmente Utilizada:**
+    - A través del acceso byte por byte, se activó la asignación diferida (**Lazy Allocation**) del kernel.
+    - Se verificó que la memoria asignada inicialmente estaba completamente inicializada en `0`, lo que garantiza la
+      consistencia del sistema.
+    - Hasta que no se accedió a la memoria, no hubo una asignación física en la RAM.
+
+3. **Relación Solicitada vs. Utilizada:**
+    - **Memoria Virtual (Solicitada):** El kernel reserva el espacio virtual inmediatamente tras la llamada a
+      `tamalloc`, pero este no representa memoria física real hasta que se accede.
+    - **Memoria Física (Utilizada):** La memoria física real (RAM) solo se asigna cuando cada byte es leído o escrito,
+      como se demostró al escribir caracteres aleatorios en el bloque.
+
+4. **Resultados Observados:**
+    - El sistema optimiza el uso de memoria física mediante asignación diferida, minimizando el impacto de reservar
+      grandes bloques.
+    - Durante las pruebas, se corroboró que la memoria escrita activa el mecanismo **Copy-on-Write (CoW)**, reutilizando
+      páginas existentes cuando es posible.
+
+5. **Conclusión:**
+    - La diferencia entre memoria solicitada y utilizada demuestra cómo Linux gestiona eficientemente los recursos
+      mediante técnicas como la asignación diferida.
+    - Este comportamiento es ideal para sistemas que requieren grandes reservas de memoria virtual sin necesidad
+      inmediata de asignación física.
 
 ## **Documentación del módulo `system_stats`**
 
