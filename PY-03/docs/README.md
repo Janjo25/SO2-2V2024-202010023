@@ -397,3 +397,60 @@ SYSCALL_DEFINE1(so2_remove_memory_limit, pid_t, pid) {
     return -102;
 }
 ```
+
+## **Desarrollo de Habilidades Blandas**
+
+### **Autogestión del Tiempo**
+
+Dado el tiempo limitado para completar este proyecto, se realizó una planificación meticulosa para garantizar el
+cumplimiento de los objetivos en menos de una semana. Este fue el cronograma seguido:
+
+#### **Sábado: Investigación Inicial**
+
+El día comenzó con un análisis detallado del enunciado del proyecto. Esto incluyó:
+
+- Identificar los requisitos de las cuatro syscalls.
+- Investigar sobre el manejo de listas enlazadas en el kernel de Linux, el uso de spinlocks y cómo trabajar con
+  estructuras como `task_struct`.
+- Estudiar la documentación de syscalls en Linux y ejemplos de implementación.
+
+#### **Domingo: Implementación de las Primeras Syscalls**
+
+Se procedió con la implementación inicial de las syscalls `so2_add_memory_limit` y `so2_get_memory_limits`:
+
+- Configuración del entorno de desarrollo del kernel.
+- Creación de las estructuras necesarias, como `memory_node` y la lista global `memory_list`.
+- Implementación de la funcionalidad de agregar procesos con límites de memoria.
+- Desarrollo y pruebas preliminares de la syscall para obtener los procesos limitados.
+
+#### **Lunes: Finalización de las Syscalls Iniciales**
+
+Se completaron las pruebas de las dos primeras syscalls:
+
+- Validaciones de entradas y manejo de errores.
+- Ajustes en el manejo de la lista enlazada para evitar inconsistencias en concurrencia.
+- Verificación de funcionalidad usando programas de usuario.
+
+#### **Martes: Implementación de las Syscalls Restantes**
+
+Se inició la implementación de las syscalls `so2_update_memory_limit` y `so2_remove_memory_limit`:
+
+- Desarrollo de la lógica para buscar y actualizar o eliminar nodos de la lista enlazada.
+- Manejo de errores específicos para estas operaciones.
+- Se realizaron pruebas básicas para confirmar que los nodos eran modificados o eliminados correctamente.
+
+#### **Miércoles: Pruebas Finales y Ajustes**
+
+Se llevaron a cabo pruebas exhaustivas de las cuatro syscalls:
+
+- Validación de todos los posibles errores especificados en el enunciado.
+- Optimización del manejo de memoria y spinlocks.
+- Identificación y resolución de errores encontrados durante las pruebas de integración.
+
+#### **Jueves: Migración del Código y Documentación**
+
+Se realizó la migración del código desde un único archivo (`sys.c`) a un diseño modular:
+
+- Creación de archivos individuales para cada syscall y su integración en el kernel.
+- Actualización de la tabla de syscalls y ajustes en el `Makefile`.
+- Redacción de la documentación técnica, detallando el diseño, implementación y funcionamiento del proyecto.
