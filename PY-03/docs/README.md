@@ -454,3 +454,37 @@ Se realizó la migración del código desde un único archivo (`sys.c`) a un dis
 - Creación de archivos individuales para cada syscall y su integración en el kernel.
 - Actualización de la tabla de syscalls y ajustes en el `Makefile`.
 - Redacción de la documentación técnica, detallando el diseño, implementación y funcionamiento del proyecto.
+
+### **Responsabilidad, Compromiso y Resolución de Problemas**
+
+A lo largo del proyecto, me enfrenté a diversos desafíos que requirieron compromiso, creatividad y una cuidadosa
+resolución de problemas. Los más destacados fueron los siguientes:
+
+#### **1. Implementar la Primera Syscall (`so2_add_memory_limit`)**
+
+El primer reto significativo fue implementar la syscall para agregar procesos con límites de memoria. A pesar de tener
+experiencia previa trabajando con estructuras como `task_struct`, la implementación inicial no cumplía con los
+requisitos del enunciado. Probé múltiples enfoques para iterar sobre los procesos y proteger la lista enlazada con
+`spinlocks`, pero siempre surgían inconsistencias o fallos en las pruebas.
+
+Finalmente, con la orientación del auxiliar, entendí que debía seguir un enfoque más estructurado al interceptar ciertas
+llamadas internas del kernel, como `do_brk_flags` y `ksys_mmap_pgoff`, para garantizar la asignación y manejo correcto
+de memoria. Esto resultó ser clave para resolver el problema y avanzar con confianza en la implementación.
+
+Esta experiencia reforzó la importancia de detenerme a analizar problemas con mayor profundidad, así como la utilidad de
+pedir orientación cuando es necesario.
+
+#### **2. Migración del Código desde `sys.c` a un Diseño Modular**
+
+Otro reto significativo fue migrar el código de un único archivo monolítico (`sys.c`) a un diseño modular en múltiples
+archivos, como lo exige el estilo de desarrollo del kernel de Linux. Aunque técnicamente parecía sencillo, me enfrenté a
+errores de compilación que inicialmente no entendía, como variables globales no declaradas (`memory_list_lock`),
+conflictos de nombres y dependencias mal organizadas en el `Makefile`.
+
+El problema más frustrante fue que la implementación funcionaba perfectamente en `sys.c`, pero al dividir el código
+comenzaron a surgir fallos que no habían aparecido antes. Esto me obligó a revisar minuciosamente la forma en que las
+variables globales y funciones se compartían entre archivos mediante `extern` y a reorganizar las definiciones en un
+archivo dedicado (`memory_limiter.c`).
+
+Este desafío me enseñó la importancia de organizar adecuadamente los archivos y mantener una estructura modular desde el
+principio. También me ayudó a comprender mejor cómo funcionan las dependencias y los enlaces en el kernel.
