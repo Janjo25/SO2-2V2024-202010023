@@ -389,6 +389,10 @@
 465	common	tamalloc	sys_tamalloc
 466	common	get_mem_stats	sys_get_mem_stats
 467	common	get_total_mem_stats	sys_get_total_mem_stats
+557	common	so2_add_memory_limit	sys_so2_add_memory_limit
+558	common	so2_get_memory_limits	sys_so2_get_memory_limits
+559	common	so2_update_memory_limit	sys_so2_update_memory_limit
+560	common	so2_remove_memory_limit	sys_so2_remove_memory_limit
 
 #
 # Due to a historical design error, certain syscalls are numbered differently
