@@ -488,3 +488,29 @@ archivo dedicado (`memory_limiter.c`).
 
 Este desafío me enseñó la importancia de organizar adecuadamente los archivos y mantener una estructura modular desde el
 principio. También me ayudó a comprender mejor cómo funcionan las dependencias y los enlaces en el kernel.
+
+### **Reflexión Personal**
+
+Nunca me imaginé manipulando los archivos del kernel, y ahora que lo he hecho, mi respeto por quienes trabajan en
+proyectos de código abierto y hacen posible que tengamos un sistema funcional ha crecido enormemente. Trabajar en el
+kernel de Linux me permitió ver de cerca el increíble esfuerzo que hay detrás de cada línea de código que compone este
+sistema operativo.
+
+El lenguaje C, aunque fascinante, también me resultó desafiante. Comparado con lenguajes modernos, su naturaleza directa
+y su relación con el hardware requieren una atención minuciosa. Me sorprendió la habilidad que tienen los
+desarrolladores del kernel para manejar múltiples archivos y funciones exclusivas, todo mientras mantienen la
+estabilidad y funcionalidad del sistema.
+
+A través de este proyecto, aprendí mucho sobre el funcionamiento interno de Linux. Desde el uso de la terminal hasta la
+personalización, siempre me ha encantado trabajar con este sistema operativo, pero comprender cómo se construye y
+mantiene a través del esfuerzo colaborativo de una comunidad global ha aumentado mi aprecio. La filosofía de trabajo en
+equipo y la apertura para compartir conocimientos es algo que, sinceramente, me inspira.
+
+El curso presentó un grado considerable de dificultad, pero lo que más me afectó fue el tiempo. Cada pequeño avance
+requería una enorme cantidad de investigación, lectura, pruebas y errores. Además, estaba el constante miedo de dañar el
+kernel, pero, afortunadamente, nunca llegué a hacerlo. Esto me demostró que, con cuidado, paciencia y preparación, soy
+capaz de enfrentar tareas complejas y lograrlas.
+
+Este proyecto no solo expandió mi conocimiento técnico, sino que también reforzó en mí valores como la organización, la
+perseverancia y el respeto por los detalles. Ahora entiendo mejor lo que significa contribuir a algo más grande que uno
+mismo, como lo es el desarrollo de Linux.
